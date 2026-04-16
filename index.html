@@ -180,6 +180,13 @@
   /* Result view */
   .result-view { flex:1; display:none; padding:30px 40px; max-width:800px; margin:0 auto; width:100%; }
   .result-view.visible { display: block; }
+  .result-quick-input { margin-bottom: 24px; }
+  .result-quick-input input {
+    width: 100%; padding: 12px 16px; border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius); font-size: 14px; outline: none; background: white; color: var(--gray-800);
+  }
+  .result-quick-input input:focus { border-color: var(--blue); }
+  .result-quick-input input::placeholder { color: var(--gray-400); }
   .original-text { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
   .lang-label {
     display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
@@ -305,7 +312,7 @@
     <div class="hero-icon">say</div>
     <h1 class="hero-title">say.ima</h1>
     <p class="hero-sub">AIが解説付きでバシッと翻訳！</p>
-    <div class="shortcut-hint"><kbd>⌘</kbd> + <kbd>Enter</kbd> で即翻訳</div>
+    <div class="shortcut-hint"><kbd>⌘</kbd> + <kbd>Enter</kbd> で即翻訳（どこからでも）</div>
 
     <div class="style-section">
       <div class="style-toggle">
@@ -355,6 +362,9 @@
 
   <!-- Result view -->
   <div class="result-view" id="resultView">
+    <div class="result-quick-input">
+      <input type="text" id="quickInput" placeholder="別のテキストを翻訳（Enterで送信）" onkeydown="handleQuickKey(event)">
+    </div>
     <div id="resultContent"></div>
   </div>
 </div>
@@ -494,6 +504,29 @@ function selectChip(el) {
 function handleKey(e) {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); doTranslate(); }
 }
+
+// ⌘+Enter グローバルショートカット（結果画面からでも即翻訳）
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    const homeView = document.getElementById('homeView');
+    const textarea = document.getElementById('inputText');
+    const isHomeVisible = homeView && homeView.style.display !== 'none';
+    if (isHomeVisible && textarea.value.trim()) {
+      // ホーム画面でテキストがあれば即翻訳
+      doTranslate();
+    } else {
+      // 結果画面 or テキストなし → ホームに戻ってテキストエリアにフォーカス
+      goHome();
+      setTimeout(() => textarea.focus(), 100);
+    }
+  }
+});
+function handleQuickKey(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const text = document.getElementById('quickInput').value.trim();
+    if (text) { document.getElementById('inputText').value = text; document.getElementById('quickInput').value = ''; doTranslate(); }
   }
 }
 function goHome() {
@@ -516,18 +549,7 @@ function renderHistory() {
 }
 function loadHistoryItem(id) {
   const item = history.find(h => h.id === id);
-  if (!item) return;
-  if (item.result) {
-    // 保存済み結果を直接表示
-    currentResult = { text: item.text, result: item.result, id: item.id };
-    showResult(currentResult, false);
-    document.querySelectorAll('.history-item').forEach(h => {
-      h.classList.toggle('active', parseInt(h.dataset.id) === id);
-    });
-  } else {
-    document.getElementById('inputText').value = item.text;
-    goHome();
-  }
+  if (item) { document.getElementById('inputText').value = item.text; goHome(); }
 }
 function deleteHistoryItem(e, id) {
   e.stopPropagation();
@@ -581,7 +603,7 @@ async function doTranslate() {
     currentResult = { text, targetLang: selectedLang, style: selectedStyle, result: { ...phase1, keyPhrases: [] }, id };
 
     // 履歴保存
-    history.unshift({ id, text: text.substring(0, 60), timestamp: Date.now(), result: { ...phase1, keyPhrases: [] } });
+    history.unshift({ id, text: text.substring(0, 60), timestamp: Date.now() });
     if (history.length > 50) history.pop();
     localStorage.setItem('sayima_history', JSON.stringify(history));
     renderHistory();
