@@ -287,15 +287,50 @@
     .home-view { padding: 30px 16px 30px; }
     .result-view { padding: 20px 16px; }
   }
+
+  /* ===== Dark Mode ===== */
+  [data-theme="dark"] {
+    --blue-light: #0d2d40;
+    --gray-800: #eeeeff;
+    --gray-700: #ccccdd;
+    --gray-600: #9090b0;
+    --gray-400: #505070;
+    --gray-200: #252538;
+    --gray-100: #1a1a2c;
+    --shadow: 0 2px 8px rgba(0,0,0,0.5);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+  }
+  [data-theme="dark"] body { background: #0f0f1e; color: var(--gray-800); }
+  [data-theme="dark"] .sidebar { background: #0a0a18; border-color: var(--gray-200); }
+  [data-theme="dark"] .new-btn { background: var(--gray-200); color: var(--gray-700); }
+  [data-theme="dark"] .new-btn:hover { background: #2e2e45; }
+  [data-theme="dark"] .history-item { color: var(--gray-700); }
+  [data-theme="dark"] .history-item:hover,[data-theme="dark"] .history-item.active { background: var(--gray-200); }
+  [data-theme="dark"] .sidebar-footer { border-color: var(--gray-200); }
+  [data-theme="dark"] .home-view,[data-theme="dark"] .result-view { background: #0f0f1e; }
+  [data-theme="dark"] .translation-card,[data-theme="dark"] .keyphrase-card { background: #1a1a2c; }
+  [data-theme="dark"] .kp-example { background: var(--gray-200); }
+  [data-theme="dark"] .input-card { background: #1a1a2c; border-color: var(--gray-200); }
+  [data-theme="dark"] .input-textarea { background: #1a1a2c; color: var(--gray-800); }
+  [data-theme="dark"] .input-footer { border-color: var(--gray-200); }
+  [data-theme="dark"] .lang-badge { background: #1a1a2c; border-color: var(--gray-200); color: var(--gray-700); }
+  [data-theme="dark"] .lang-popup { background: #1a1a2c; border-color: var(--gray-200); }
+  [data-theme="dark"] .chip { background: #1a1a2c; border-color: var(--gray-200); color: var(--gray-600); }
+  [data-theme="dark"] .copy-btn { border-color: var(--gray-200); color: var(--gray-600); }
+  [data-theme="dark"] .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+  [data-theme="dark"] .kp-syn-tag,[data-theme="dark"] .keyphrase-badge,[data-theme="dark"] .lang-label { background: var(--gray-200); }
+  [data-theme="dark"] .clear-all-btn { color: var(--gray-400); }
+  [data-theme="dark"] .freq-badge { background: #2d2200; color: #e6a700; }
+  [data-theme="dark"] .error-banner { background: #2d1010; border-color: #6d2020; color: #ff8080; }
 </style>
 </head>
 <body>
 
 <!-- Sidebar -->
 <aside class="sidebar">
-  <div class="sidebar-header">
-    <div class="logo">say</div>
-    <span class="brand">say.ima</span>
+  <div class="sidebar-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:8px;"><div class="logo">say</div><span class="brand">say.ima</span></div>
+    <button id="darkModeBtn" onclick="toggleDarkMode()" style="background:none;border:none;font-size:18px;cursor:pointer;padding:4px;line-height:1;" title="ダークモード切替">🌙</button>
   </div>
   <button class="new-btn" onclick="goHome()">+ あたらしく翻訳</button>
   <div class="history-list" id="historyList"></div>
@@ -426,6 +461,58 @@
 </div>
 
 <script>
+
+// ===== Dark Mode =====
+(function() {
+  const saved = localStorage.getItem('sayima_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const theme = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('sayima_theme', theme);
+  const btn = document.getElementById('darkModeBtn');
+  if (btn) btn.textContent = isDark ? '🌙' : '☀️';
+}
+// Init dark button icon
+window.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('darkModeBtn');
+  if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+});
+
+// ===== Text-to-Speech =====
+const _langCode = {
+  '英語':'en-US','日本語':'ja-JP','中国語':'zh-CN','韓国語':'ko-KR',
+  'フランス語':'fr-FR','スペイン語':'es-ES','ドイツ語':'de-DE',
+  'ポルトガル語':'pt-BR','タイ語':'th-TH',
+  'English':'en-US','Japanese':'ja-JP','Chinese':'zh-CN','Korean':'ko-KR',
+  'French':'fr-FR','Spanish':'es-ES','German':'de-DE','Portuguese':'pt-BR','Thai':'th-TH'
+};
+let _ttsActive = false;
+function speakTranslation(text, lang) {
+  if (!window.speechSynthesis) return;
+  const btn = document.getElementById('speakBtn');
+  if (window.speechSynthesis.speaking || _ttsActive) {
+    window.speechSynthesis.cancel();
+    _ttsActive = false;
+    if (btn) { btn.innerHTML = '🔊 読み上げ'; btn.style.color = ''; }
+    return;
+  }
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = _langCode[lang] || 'en-US';
+  utt.rate = 0.92;
+  _ttsActive = true;
+  if (btn) { btn.innerHTML = '⏹ 停止'; btn.style.color = 'var(--blue)'; }
+  utt.onend = utt.onerror = () => {
+    _ttsActive = false;
+    if (btn) { btn.innerHTML = '🔊 読み上げ'; btn.style.color = ''; }
+  };
+  window.speechSynthesis.speak(utt);
+}
+
 // State
 let history = JSON.parse(localStorage.getItem('sayima_history') || '[]');
 let styleEnabled = false;
@@ -728,6 +815,7 @@ function showResult(r, loadingKeyPhrases = false) {
       <div class="translation-text">${escapeHtml(result.translation)}</div>
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="copy-btn" onclick="copyText(\`${escapeAttr(result.translation)}\`)">📋 コピー</button>
+        <button class="copy-btn" id="speakBtn" onclick="speakTranslation('${escapeAttr(result.translation)}', '${result.targetLang}')">🔊 読み上げ</button>
       </div>
       <ul class="explanation-list">
         ${(result.explanations || []).map(e => `<li>${escapeHtml(e)}</li>`).join('')}
