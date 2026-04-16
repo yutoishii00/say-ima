@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>say.ima - AI解説付き翻訳</title>
+<!-- PWA manifest -->
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoic2F5LmltYSIsInNob3J0X25hbWUiOiJzYXkuaW1hIiwic3RhcnRfdXJsIjoiLiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmMGY4ZmYiLCJ0aGVtZV9jb2xvciI6IiMxZGExZjIiLCJpY29ucyI6W119">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="say.ima">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
@@ -68,6 +73,11 @@
     transition: all 0.15s; text-align: center;
   }
   .clear-all-btn:hover { border-color: #e74c3c; color: #e74c3c; background: #fde8e8; }
+  .settings-link {
+    font-size: 12px; color: var(--gray-400); cursor: pointer; text-align: center;
+    padding: 4px; border-radius: 4px; transition: color 0.15s;
+  }
+  .settings-link:hover { color: var(--blue); }
 
   /* Main */
   .main { flex: 1; margin-left: 280px; display: flex; flex-direction: column; min-height: 100vh; }
@@ -228,6 +238,25 @@
   .kp-syn-tag { padding:3px 10px; background:var(--gray-100); border-radius:4px; font-size:12px; color:var(--gray-600); }
   .freq-badge { float:right; font-size:11px; padding:2px 8px; background:#fff8e6; color:#e6a700; border-radius:4px; }
 
+  /* Modals */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4);
+    z-index:100; align-items:center; justify-content:center;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal { background:white; border-radius:var(--radius); padding:28px; width:420px; max-width:90vw; box-shadow:var(--shadow-lg); }
+  .modal h3 { margin-bottom: 16px; font-size: 18px; }
+  .modal label { display:block; font-size:13px; color:var(--gray-600); margin-bottom:6px; }
+  .modal input, .modal select {
+    width:100%; padding:10px 12px; border:1.5px solid var(--gray-200);
+    border-radius:var(--radius-sm); font-size:14px; outline:none; margin-bottom:16px;
+  }
+  .modal input:focus, .modal select:focus { border-color: var(--blue); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; }
+  .modal-actions button { padding:8px 20px; border-radius:var(--radius-sm); font-size:14px; cursor:pointer; border:none; }
+  .btn-cancel { background:var(--gray-100); color:var(--gray-600); }
+  .btn-save { background:var(--blue); color:white; }
+
   /* Copy button */
   .copy-btn {
     background:none; border:1px solid var(--gray-200); border-radius:6px; padding:4px 8px;
@@ -251,12 +280,6 @@
   }
   @keyframes skeleton-shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-  /* Error banner */
-  .error-banner {
-    background: #fde8e8; border: 1px solid #f5a6a6; border-radius: var(--radius-sm);
-    padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #c0392b;
-  }
-
   /* Responsive */
   @media (max-width: 768px) {
     .sidebar { display: none; }
@@ -278,6 +301,7 @@
   <div class="history-list" id="historyList"></div>
   <div class="sidebar-footer">
     <button class="clear-all-btn" onclick="clearAllHistory()">履歴をすべて削除</button>
+    <div class="settings-link" onclick="openSettings()">⚙️ API設定</div>
   </div>
 </aside>
 
@@ -345,6 +369,62 @@
   </div>
 </div>
 
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h3>⚙️ API設定</h3>
+    <label>APIプロバイダー</label>
+    <select id="apiProvider">
+      <option value="gemini">Google Gemini（おすすめ・無料枠あり）</option>
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="openai">OpenAI (GPT)</option>
+    </select>
+    <label>APIキー</label>
+    <input type="password" id="apiKey" placeholder="AIza... / sk-...">
+    <p style="font-size:11px;color:var(--blue);margin:-10px 0 6px">
+      <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">Geminiの無料APIキーはこちら →</a>
+    </p>
+    <p style="font-size:12px;color:var(--gray-400);margin-bottom:16px">
+      キーはブラウザのローカルストレージに保存されます。サーバーには送信されません。
+    </p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSettings()">キャンセル</button>
+      <button class="btn-save" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install modal popup -->
+<div class="modal-overlay" id="installModal">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px">🚀</div>
+    <h3 style="font-size:20px;margin-bottom:16px">say.ima をMacアプリにしよう</h3>
+
+    <div style="background:var(--gray-100);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;text-align:left">
+      <p style="font-size:13px;color:var(--gray-800);font-weight:700;margin-bottom:10px">📋 セットアップ（10秒で完了）</p>
+      <p style="font-size:13px;color:var(--gray-600);line-height:2">
+        <strong>1.</strong>「<strong>say.ima を開く.command</strong>」と「<strong>nani-translate.html</strong>」を同じフォルダに置く<br>
+        <strong>2.</strong>「say.ima を開く.command」をダブルクリック → 独立ウィンドウで起動！<br>
+        <strong>3.</strong> Dockに表示されたChromeアイコンを右クリック →「<strong>オプション</strong>」→「<strong>Dockに追加</strong>」
+      </p>
+    </div>
+
+    <div style="background:#e8f5fd;border-radius:var(--radius-sm);padding:14px;margin-bottom:20px;text-align:left">
+      <p style="font-size:13px;color:var(--gray-800);font-weight:600;margin-bottom:6px">✨ これでできること</p>
+      <p style="font-size:12px;color:var(--gray-600);line-height:1.8">
+        ・<kbd style="background:white;border:1px solid var(--gray-300);border-radius:3px;padding:1px 5px;font-size:11px">⌘Space</kbd> → <strong>say.ima</strong> で即起動<br>
+        ・Dockに常駐してワンクリック起動<br>
+        ・独立ウィンドウ（Chrome --app モード）で開く
+      </p>
+    </div>
+
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn-cancel" onclick="dismissInstall()">あとで</button>
+      <button class="btn-save" onclick="dismissInstall()" style="background:var(--blue)">わかった！</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // State
 let history = JSON.parse(localStorage.getItem('sayima_history') || '[]');
@@ -355,6 +435,8 @@ let selectedLang = '英語';
 
 // Init
 renderHistory();
+checkApiKey();
+showInstallHint();
 updateLangHighlight();
 
 // Close lang popup on outside click
@@ -363,6 +445,24 @@ document.addEventListener('click', (e) => {
     document.getElementById('langPopup').classList.remove('visible');
   }
 });
+
+function checkApiKey() {
+  const key = localStorage.getItem('sayima_api_key');
+  if (!key) setTimeout(() => document.getElementById('settingsModal').classList.add('visible'), 500);
+}
+function openSettings() { document.getElementById('settingsModal').classList.add('visible'); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('visible'); }
+function saveSettings() {
+  const key = document.getElementById('apiKey').value.trim();
+  const provider = document.getElementById('apiProvider').value;
+  if (key) {
+    localStorage.setItem('sayima_api_key', key);
+    localStorage.setItem('sayima_api_provider', provider);
+    closeSettings();
+  }
+}
+document.getElementById('apiKey').value = localStorage.getItem('sayima_api_key') || '';
+document.getElementById('apiProvider').value = localStorage.getItem('sayima_api_provider') || 'gemini';
 
 // Language popup
 function toggleLangPopup(e) {
@@ -447,83 +547,155 @@ function clearAllHistory() {
   }
 }
 
-// ========== Translation via server proxy ==========
-async function callProxy(prompt) {
-  const resp = await fetch('/api/translate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
-  });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || `Server error ${resp.status}`);
-  const raw = data.result;
-  const m = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (m) return JSON.parse(m[0]);
-  throw new Error('Parse failed');
+// Install popup
+function showInstallHint() {
+  if (localStorage.getItem('sayima_install_dismissed')) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  // Show immediately on page load (after a tiny delay for rendering)
+  setTimeout(() => document.getElementById('installModal').classList.add('visible'), 300);
+}
+function dismissInstall() {
+  document.getElementById('installModal').classList.remove('visible');
+  localStorage.setItem('sayima_install_dismissed', '1');
 }
 
-// Phase 1: 翻訳＋解説
-async function callPhase1(text, targetLang, style) {
-  const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
-  const finalTarget = targetLang === '自動検出' ? (isJapanese ? '英語' : '日本語') : targetLang;
-  const styleInstruction = style ? `文体:「${style}」で。` : '';
-  const prompt = `翻訳者として以下をJSON形式で返してください（コードブロック不要）:
-{"detectedLang":"検出言語名","targetLang":"翻訳先言語名","translation":"翻訳結果","explanations":["解説1","解説2"]}
-${finalTarget}に翻訳: 「${text}」${styleInstruction}`;
-  return await callProxy(prompt);
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  // Inline minimal service worker via blob
+  const swCode = `self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));`;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
 }
 
-// Phase 2: キーフレーズ
-async function callPhase2(originalText, translatedText) {
-  const prompt = `言語教師として、以下の翻訳のキーフレーズをJSON配列で返してください（コードブロック不要）:
-原文: 「${originalText}」
-訳文: 「${translatedText}」
-[{"word":"単語","pronunciation":"発音","definitions":["意味1","意味2"],"example":{"original":"例文","translated":"訳"},"synonyms":["類語1","類語2"]}]
-2〜3個選んでください。`;
-  const raw = await callProxy(prompt);
-  if (Array.isArray(raw)) return raw;
-  if (raw.keyPhrases) return raw.keyPhrases;
-  return [];
-}
-
-// Main translate function
+// Translation - 2フェーズ：翻訳を先に表示 → キーフレーズを後から非同期ロード
 async function doTranslate() {
   const text = document.getElementById('inputText').value.trim();
   if (!text) return;
+  const apiKey = localStorage.getItem('sayima_api_key');
+  if (!apiKey) { openSettings(); return; }
   const btn = document.getElementById('translateBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span> 翻訳中...';
+  const provider = localStorage.getItem('sayima_api_provider') || 'gemini';
   try {
-    const phase1 = await callPhase1(text, selectedLang, selectedStyle);
+    // Phase 1: 翻訳＋解説だけ（速い）
+    const phase1 = await callAI_phase1(text, selectedLang, selectedStyle, provider, apiKey);
     const id = Date.now();
     currentResult = { text, targetLang: selectedLang, style: selectedStyle, result: { ...phase1, keyPhrases: [] }, id };
 
+    // 履歴保存
     history.unshift({ id, text: text.substring(0, 60), timestamp: Date.now() });
     if (history.length > 50) history.pop();
     localStorage.setItem('sayima_history', JSON.stringify(history));
     renderHistory();
 
+    // 翻訳結果をすぐ表示（キーフレーズはローディング中表示）
     showResult(currentResult, true);
     btn.disabled = false;
     btn.innerHTML = '翻訳する ↑';
 
-    callPhase2(text, phase1.translation)
+    // Phase 2: キーフレーズを非同期で後からロード
+    callAI_phase2(text, phase1.translation, phase1.detectedLang, provider, apiKey)
       .then(keyPhrases => {
         currentResult.result.keyPhrases = keyPhrases;
         renderKeyPhrases(keyPhrases);
       })
       .catch(() => {
-        const el = document.getElementById('kp-loading');
-        if (el) el.innerHTML = '<p style="color:var(--gray-400);font-size:13px;padding:16px 0">キーフレーズの取得に失敗しました</p>';
+        document.getElementById('kp-loading').innerHTML =
+          '<p style="color:var(--gray-400);font-size:13px;padding:16px 0">キーフレーズの取得に失敗しました</p>';
       });
   } catch (err) {
+    alert('翻訳エラー: ' + err.message + '\n\nAPIキーを確認してください。');
+    openSettings();
     btn.disabled = false;
     btn.innerHTML = '翻訳する ↑';
-    const content = document.getElementById('resultContent');
-    document.getElementById('homeView').style.display = 'none';
-    document.getElementById('resultView').classList.add('visible');
-    content.innerHTML = `<div class="error-banner">⚠️ 翻訳エラー: ${escapeHtml(err.message)}</div>`;
   }
+}
+
+// Gemini auto-detect model
+let _cachedGeminiModel = null;
+async function getGeminiModel(apiKey) {
+  if (_cachedGeminiModel) return _cachedGeminiModel;
+  try {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!resp.ok) throw new Error('Failed to list models');
+    const data = await resp.json();
+    const preferred = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const available = data.models.filter(m => m.supportedGenerationMethods?.includes('generateContent')).map(m => m.name.replace('models/', ''));
+    for (const p of preferred) {
+      const match = available.find(a => a.startsWith(p));
+      if (match) { _cachedGeminiModel = match; return match; }
+    }
+    const fallback = available.find(a => a.startsWith('gemini'));
+    if (fallback) { _cachedGeminiModel = fallback; return fallback; }
+    throw new Error('No model');
+  } catch (e) { return 'gemini-2.5-flash'; }
+}
+
+// ========== Phase 1: 翻訳＋解説のみ（軽量・高速） ==========
+async function callAI_phase1(text, targetLang, style, provider, apiKey) {
+  const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+  const finalTarget = targetLang === '自動検出' ? (isJapanese ? '英語' : '日本語') : targetLang;
+  const styleInstruction = style ? `文体:「${style}」で。` : '';
+
+  const prompt = `翻訳者として以下をJSON形式で返してください（コードブロック不要）:
+{"detectedLang":"検出言語名","targetLang":"翻訳先言語名","translation":"翻訳結果","explanations":["解説1","解説2"]}
+${finalTarget}に翻訳: 「${text}」${styleInstruction}`;
+
+  return await _callProvider(provider, apiKey, prompt);
+}
+
+// ========== Phase 2: キーフレーズのみ（非同期・後からロード） ==========
+async function callAI_phase2(originalText, translatedText, detectedLang, provider, apiKey) {
+  const prompt = `言語教師として、以下の翻訳のキーフレーズをJSON配列で返してください（コードブロック不要）:
+原文: 「${originalText}」
+訳文: 「${translatedText}」
+[{"word":"単語","pronunciation":"発音","definitions":["意味1","意味2"],"example":{"original":"例文","translated":"訳"},"synonyms":["類語1","類語2"]}]
+2〜3個選んでください。`;
+
+  const raw = await _callProvider(provider, apiKey, prompt);
+  // 配列で返ってくる場合の対応
+  if (Array.isArray(raw)) return raw;
+  if (raw.keyPhrases) return raw.keyPhrases;
+  return [];
+}
+
+// ========== 共通API呼び出し ==========
+async function _callProvider(provider, apiKey, prompt) {
+  let raw;
+  if (provider === 'gemini') {
+    const model = await getGeminiModel(apiKey);
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+      })
+    });
+    if (!resp.ok) throw new Error(`Gemini Error: ${resp.status} - ${await resp.text()}`);
+    raw = (await resp.json()).candidates[0].content.parts[0].text;
+  } else if (provider === 'openai') {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.2, response_format: { type: 'json_object' } })
+    });
+    if (!resp.ok) throw new Error(`OpenAI Error: ${resp.status}`);
+    raw = (await resp.json()).choices[0].message.content;
+  } else {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!resp.ok) throw new Error(`Anthropic Error: ${resp.status} - ${await resp.text()}`);
+    raw = (await resp.json()).content[0].text;
+  }
+  // JSON抽出
+  const m = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (m) return JSON.parse(m[0]);
+  throw new Error('Parse failed');
 }
 
 function showResult(r, loadingKeyPhrases = false) {
